@@ -1,0 +1,120 @@
+package require Tk
+
+source "form2.wish"
+
+wm title . "XGP-Shortcut"
+wm resizable . 0 0
+wm protocol . WM_DELETE_WINDOW "cleanup; exit"
+
+bind . <Escape> { exit }
+
+set gamePath "Browse to a game install folder."
+set arguments ""
+set commonArguments ""
+set validPath 0
+
+if {[catch {
+    image create photo imgobj -file "Debugempty-Whirl.png"
+}]} {
+    image create photo imgobj -width 44 -height 44
+}
+
+grid [ttk::labelframe .lf1 -text " Shortcut Preview " -width 144 -height 150] -column 1 -row 0 -sticky ns
+grid [ttk::labelframe .lf2 -text " File " -width 285 -height 150] -column 2 -row 0 -sticky ns
+grid [ttk::labelframe .lf3 -text " Log " -width 257 -height 150] -column 3 -row 0 -sticky ns
+grid [ttk::frame .toolStrip -height 25] -column 0 -row 1 -columnspan 4 -sticky we
+
+grid [ttk::label .lf1.shortcutPreview -image imgobj -relief sunken]
+
+grid columnconfigure .lf1 0 -weight 1
+grid rowconfigure .lf1 0 -weight 1
+
+grid [ttk::label .lf2.file_label -textvariable gamePath -relief sunken -padding "4 0"] -column 0 -row 0 -sticky nsew
+grid [ttk::button .lf2.browse -text "Browse" -command browseClick] -column 1 -row 0
+grid [ttk::entry .lf2.arguments -textvariable arguments] -column 0 -row 2 -columnspan 2 -sticky we
+grid [ttk::combobox .lf2.commonArguments -textvariable commonArguments -state readonly] -column 0 -row 3 -sticky nsew
+grid [ttk::button .lf2.add -text "Add" -command addArgument] -column 1 -row 3
+grid [ttk::button .lf2.createShortcut -text "Create Shortcut"] -column 0 -row 4 -columnspan 2 -sticky we
+
+.lf2.commonArguments configure -values [list -nointro -skipintro -nostartupmovies -novideo -skipmovies]
+
+grid [text .lf3.logOutput -state disabled] -sticky nsew
+grid columnconfigure .lf3 0 -weight 1
+grid rowconfigure .lf3 0 -weight 1
+grid propagate .lf3 0
+
+grid [ttk::label .toolStrip.version -text "Version 1.1-ttk" -state disabled]  -column 0 -row 0 -sticky w
+grid [ttk::label .toolStrip.copyright -text "© 2025 EvokeMadness" -state disabled]  -column 1 -row 0 -sticky e
+grid [ttk::button .toolStrip.licenses -text "Third-Party Licenses" -command readLicense]  -column 2 -row 0 -sticky e
+
+grid columnconfigure .toolStrip 0 -weight 1
+
+proc cleanup {} {
+    global gamePath
+    set ::validPath 0
+    set gamePath "Browse to a game install folder."
+}
+
+proc browseClick {} {
+    cleanup
+    set selectedPath [tk_chooseDirectory -initialdir ~ -title "Select Folder"]
+    if {$selectedPath ne ""} {
+        if {[file tail $selectedPath] eq "Content"} {
+            set gamePath [file dirname "$selectedPath"]
+        } else {
+            set gamePath "$selectedPath"
+        }
+        if {[file isdirectory [file join $gamePath "Content"]]} {
+            set contentPath [file join $gamePath "Content"]
+        } else {
+            set contentPath ""
+        }
+        if {[file isfile [file join $contentPath "appxmanifest.xml"]]} {
+            set configPath [file join $contentPath "appxmanifest.xml"]
+        } else {
+            set configPath ""
+        }
+
+        validatePath "$selectedPath" "$gamePath" "$contentPath" "$configPath"
+    } else {
+        writeToLog "No folder selected."
+    }
+}
+
+proc addArgument {} {
+    global arguments commonArguments
+    if {$commonArguments eq ""} {
+        return
+    }
+    set arguments "$arguments $commonArguments"
+    writeToLog "Added`$commonArguments` to arguments."
+}
+
+proc writeToLog {msg} {
+    set numlines [lindex [split [.lf3.logOutput index "end - 1 line"] "."] 0]
+    .lf3.logOutput configure -state normal
+    if {$numlines==24} {.lf3.logOutput delete 1.0 2.0}
+    if {[.lf3.logOutput index "end-1c"]!="1.0"} {.lf3.logOutput insert end "\n"}
+    .lf3.logOutput insert end "$msg"
+    .lf3.logOutput configure -state disabled
+}
+
+proc validatePath {selectedPath gamePath contentPath configPath} {
+    set paths [list $gamePath $contentPath $configPath]
+    if {[lsearch -exact $paths ""] == -1} {
+        set ::validPath 1
+        set ::gamePath "$selectedPath"
+        writeToLog "appxmanifest.xml found."
+
+        puts "Game path: $gamePath"
+        puts "Content path: $contentPath"
+        puts "Config path: $configPath"
+    } else {
+        set ::validPath 0
+        writeToLog "appxmanifest.xml not found in Content folder."
+    }
+}
+
+proc readConfig {} {
+    
+}
